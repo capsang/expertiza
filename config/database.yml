@@ -13,8 +13,8 @@
 development:
   adapter: mysql
   database: pg_development
-  username: root 
-  password: 
+  username: root
+  password: teamilabs
   host: localhost
 
 # Warning: The database defined as 'test' will be erased and
@@ -24,15 +24,16 @@ test: &test
   adapter: mysql
   database: pg_test
   username: root
-  password: 
+  password: teamilabs
   host: localhost
 
 production:
   adapter: mysql
   database: pg_production
   username: root
-  password: 
+  password: teamilabs
   host: localhost
- 
+
 cucumber:
   <<: *test
+

@@ -11,8 +11,11 @@
   <tr>
     <td width = "60%">Tags: <%= search_result["tags"] %></td>
     <td width = "40%">Owned by <%=search_result["user"]%></td>
-    <td>        
-    	<%= render :partial => "rating/rating", :locals => { :asset => search_result["bookmark"]} %>
+    <td>
+    	<%=
+    	  #render :partial => "rating/rating", :locals => { :asset => search_result["bookmark"]}
+    	%>
     </td>
   </tr>
 </table>
+

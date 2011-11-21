@@ -2,7 +2,7 @@ class AssignmentController < ApplicationController
   require 'ftools'
   auto_complete_for :user, :name
   before_filter :authorize
-  
+
   def copy
     Assignment.record_timestamps = false
     #creating a copy of an assignment; along with the dates and submission directory too
@@ -11,13 +11,13 @@ class AssignmentController < ApplicationController
     @user =  ApplicationHelper::get_user_role(session[:user])
     @user = session[:user]
     @user.set_instructor(new_assign)
-    new_assign.update_attribute('name','Copy of '+new_assign.name)     
+    new_assign.update_attribute('name','Copy of '+new_assign.name)
     new_assign.update_attribute('created_at',Time.now)
     new_assign.update_attribute('updated_at',Time.now)
-    
 
-    
-    if new_assign.save 
+
+
+    if new_assign.save
       Assignment.record_timestamps = true
 
       old_assign.assignment_questionnaires.each{
@@ -29,79 +29,79 @@ class AssignmentController < ApplicationController
           :notification_limit => aq.notification_limit,
           :questionnaire_weight => aq.questionnaire_weight
         )
-      }      
-      
-      DueDate.copy(old_assign.id, new_assign.id)           
+      }
+
+      DueDate.copy(old_assign.id, new_assign.id)
       new_assign.create_node()
-      
+
       flash[:note] = 'Warning: The submission directory for the copy of this assignment will be the same as the submission directory for the existing assignment, which will allow student submissions to one assignment to overwrite submissions to the other assignment.  If you do not want this to happen, change the submission directory in the new copy of the assignment.'
       redirect_to :action => 'edit', :id => new_assign.id
     else
       flash[:error] = 'The assignment was not able to be copied. Please check the original assignment for missing information.'
       redirect_to :action => 'list', :controller => 'tree_display'
-    end    
-  end  
-  
+    end
+  end
+
   def new
     #creating new assignment and setting default values using helper functions
     if params[:parent_id]
-      @course = Course.find(params[:parent_id])   
-    end    
-    
+      @course = Course.find(params[:parent_id])
+    end
+
     @assignment = Assignment.new
-    
+
     @wiki_types = WikiType.find(:all)
-    @private = params[:private] == true        
+    @private = params[:private] == true
     #calling the defalut values mathods
-    get_limits_and_weights 
+    get_limits_and_weights
   end
-  
-  
+
+
   # Toggle the access permission for this assignment from public to private, or vice versa
   def toggle_access
     assignment = Assignment.find(params[:id])
     assignment.private = !assignment.private
     assignment.save
-    
+
     redirect_to :controller => 'tree_display', :action => 'list'
   end
-  
+
   def create
-    
+
     # The Assignment Directory field to be filled in is the path relative to the instructor's home directory (named after his user.name)
     # However, when an administrator creates an assignment, (s)he needs to preface the path with the user.name of the instructor whose assignment it is.
-    
-    
+
+
     #CHECK TO ENSURE THAT BOTH SWITCH AND SUBMISSION DEADLINE ARE PROVIDED FOR SURE
-if params[:submit_deadline][:due_at] == "" || params[:submit_deadline][:due_at].nil? 
-  flash[:error] = " You have to give a submit Deadline" 
+if params[:submit_deadline][:due_at] == "" || params[:submit_deadline][:due_at].nil?
+  flash[:error] = " You have to give a submit Deadline"
   redirect_to :action => 'new', :private => params[:assignment][:private]
   return
 end
-if params[:switch_deadline][:due_at] == "" || params[:switch_deadline][:due_at].nil? 
-  flash[:error] = " You have to give a switch Deadline" 
+if params[:switch_deadline][:due_at] == "" || params[:switch_deadline][:due_at].nil?
+  flash[:error] = " You have to give a switch Deadline"
   redirect_to :action => 'new', :private => params[:assignment][:private]
   return
 end
 
 #ensure submit deadline is > switch deadline. Doesnt make sense to have it any other way!
-  if (params[:switch_deadline][:due_at] > params[:submit_deadline][:due_at]) 
- flash[:error] = " Switch deadline has to be lesser than submit deadline" 
+  if (params[:switch_deadline][:due_at] > params[:submit_deadline][:due_at])
+ flash[:error] = " Switch deadline has to be lesser than submit deadline"
  redirect_to :action => 'new', :private => params[:assignment][:private]
  return
 end
-  
-    @assignment = Assignment.new(params[:assignment])    
+
+    @assignment = Assignment.new(params[:assignment])
     @user =  ApplicationHelper::get_user_role(session[:user])
     @user = session[:user]
-    @user.set_instructor(@assignment) 
-    @assignment.submitter_count = 0    
+    @user.set_instructor(@assignment)
+    @assignment.submitter_count = 0
     ## feedback added
     ##
-    
+
     #Save team rotation constraints parameters in assignment table
-    saveTeamRotation
-    
+    #saveTeamRotation
+
     if params[:days].nil? && params[:weeks].nil?
       @days = 0
       @weeks = 0
@@ -111,12 +111,12 @@ end
       @weeks = 0
     else
       @days = params[:days].to_i
-      @weeks = params[:weeks].to_i      
+      @weeks = params[:weeks].to_i
     end
 
 
     @assignment.days_between_submissions = @days + (@weeks*7)
-    
+
     # Deadline types used in the deadline_types DB table
     deadline = DeadlineType.find_by_name("submission")
     @Submission_deadline= deadline.id
@@ -133,22 +133,22 @@ end
     #refers to the final date after which a student will not be able to switch topics for an assignment
     deadline = DeadlineType.find_by_name("switch_topics")
     @switch_topics_deadline = deadline.id
-    
-    
-    if @assignment.save 
-      set_questionnaires   
+
+
+    if @assignment.save
+      set_questionnaires
       set_limits_and_weights
-      
+
       max_round = 1
       #setting the Due Dates with a helper function written in DueDate.rb
       DueDate::set_duedate(params[:submit_deadline],@Submission_deadline, @assignment.id, max_round )
-      
+
       DueDate::set_duedate(params[:review_deadline],@Review_deadline, @assignment.id, max_round )
       #Setting the due date to switch topics,#PART OF IMPROVEMENT TO SUGGEST AND APPROVE
       DueDate::set_duedate(params[:switch_deadline],@switch_topics_deadline, @assignment.id, max_round )
       max_round = 2;
-      
-     
+
+
       if params[:assignment_helper][:no_of_reviews].to_i >= 2
         for resubmit_duedate_key in params[:additional_submit_deadline].keys
           #setting the Due Dates with a helper function written in DueDate.rb
@@ -169,31 +169,31 @@ end
            DueDate::set_duedate(params[:reviewofreview_deadline],@Review_of_review_deadline, @assignment.id, max_round )
          end
       }
-      
-      
+
+
       # Create submission directory for this assignment
       # If assignment is a Wiki Assignment (or has no directory)
       # the helper will not create a path
-      FileHelper.create_directory(@assignment)      
-      
+      FileHelper.create_directory(@assignment)
+
       # Creating node information for assignment display
       @assignment.create_node()
-      
+
       flash[:notice] = 'Assignment was successfully created.'
       redirect_to :action => 'list', :controller => 'tree_display'
-      
+
     else
       @wiki_types = WikiType.find(:all)
       render :action => 'new'
     end
-    
+
   end
   def saveTeamRotation
     #Checking if team rotation constraint is specified
     if(params[:radio_rotcond] != nil or params[:radio_rotcond] != "0")
       @assignment.rotation_condition = params[:radio_rotcond]
       #Choosing already available category
-      if(params[:category][:id] != "100") #category - Other Default id - 100                 
+      if(params[:category][:id] != "100") #category - Other Default id - 100
         @assignment.category_id = params[:category][:id]
         puts "Choosing already available category"
       #Specifying new category
@@ -202,14 +202,14 @@ end
           @category.name = params[:category][:name]
           puts "Specifying new category"
           puts @category.id
-          @category.save        
+          @category.save
           @assignment.category_id = @category.id
-      end                
+      end
     end
   end
-  
- 
-  
+
+
+
   def edit
     @assignment = Assignment.find(params[:id])
 
@@ -224,10 +224,10 @@ end
       @days = 0
     end
 
-    get_limits_and_weights    
+    get_limits_and_weights
     @wiki_types = WikiType.find(:all)
   end
-  
+
   def define_instructor_notification_limit(assignment_id, questionnaire_id, limit)
     existing = NotificationLimit.find(:first, :conditions => ['user_id = ? and assignment_id = ? and questionnaire_id = ?',session[:user].id,assignment_id,questionnaire_id])
     if existing.nil?
@@ -238,32 +238,32 @@ end
     else
       existing.limit = limit
       existing.save
-    end    
-  end  
-  
+    end
+  end
+
   def set_questionnaires
     @assignment.assignment_questionnaires.clear
     params[:questionnaires].each{
-      | key, value |       
+      | key, value |
       if value.to_i > 0 and Questionnaire.find(value)
         @assignment.questionnaires << Questionnaire.find(value)
       end
-    }     
-  end   
-  
-  def get_limits_and_weights 
-    @limits = Hash.new   
+    }
+  end
+
+  def get_limits_and_weights
+    @limits = Hash.new
     @weights = Hash.new
-    
+
     if session[:user].role.name == "Teaching Assistant"
       user_id = TA.get_my_instructor(session[:user]).id
     else
       user_id = session[:user].id
     end
-    
-    default = AssignmentQuestionnaires.find_by_user_id_and_assignment_id_and_questionnaire_id(user_id,nil,nil)   
 
-    if default!= nil    
+    default = AssignmentQuestionnaires.find_by_user_id_and_assignment_id_and_questionnaire_id(user_id,nil,nil)
+
+    if default!= nil
     @limits[:review] = default.notification_limit
     @limits[:metareview] = default.notification_limit
     @limits[:feedback] = default.notification_limit
@@ -273,25 +273,25 @@ end
     @weights[:review] = 100
     @weights[:metareview] = 0
     @weights[:feedback] = 0
-    @weights[:teammate] = 0    
-    
+    @weights[:teammate] = 0
+
     @assignment.questionnaires.each{
       | questionnaire |
       aq = AssignmentQuestionnaires.find_by_assignment_id_and_questionnaire_id(@assignment.id, questionnaire.id)
-      @limits[questionnaire.symbol] = aq.notification_limit   
+      @limits[questionnaire.symbol] = aq.notification_limit
       @weights[questionnaire.symbol] = aq.questionnaire_weight
-    }             
+    }
   end
-  
+
   def set_limits_and_weights
     if session[:user].role.name == "Teaching Assistant"
       user_id = TA.get_my_instructor(session[:user]).id
     else
       user_id = session[:user].id
     end
-    
-    default = AssignmentQuestionnaires.find_by_user_id_and_assignment_id_and_questionnaire_id(user_id,nil,nil) 
-    
+
+    default = AssignmentQuestionnaires.find_by_user_id_and_assignment_id_and_questionnaire_id(user_id,nil,nil)
+
     @assignment.questionnaires.each{
       | questionnaire |
       aq = AssignmentQuestionnaires.find_by_assignment_id_and_questionnaire_id(@assignment.id, questionnaire.id)
@@ -305,10 +305,10 @@ end
     }
   end
 
-  
+
 def update
-  
-      #added this bit of code to make sure that the submit deadline is greater than switch topic deadline 
+
+      #added this bit of code to make sure that the submit deadline is greater than switch topic deadline
     #on editing the assignment
     for due_date_key in params[:due_date].keys
          due_date_temp = DueDate.find(due_date_key)
@@ -318,15 +318,15 @@ def update
          submission_deadline = params[:due_date][due_date_key][:due_at]
          end
    end
-  
-   if (switch_topic_deadline > submission_deadline)
-     
-     flash[:error] = 'Switch Deadline has to be lesser than submission deadline.'
-     redirect_to :action => 'edit', :id => params[:id]
-     return 
-   end
 
-  
+#   if (switch_topic_deadline > submission_deadline)
+#
+#     flash[:error] = 'Switch Deadline has to be lesser than submission deadline.'
+#     redirect_to :action => 'edit', :id => params[:id]
+#     return
+#   end
+
+
     if params[:assignment][:course_id]
       begin
         Course.find(params[:assignment][:course_id]).copy_participants(params[:id])
@@ -335,7 +335,7 @@ def update
       end
     end
     @assignment = Assignment.find(params[:id])
-    begin 
+    begin
       oldpath = @assignment.get_path
     rescue
       oldpath = nil
@@ -373,10 +373,10 @@ def update
         elsif(params[:category][:name] != '')
           @category = Category.new
           @category.name = params[:category][:name]
-          @category.save        
+          @category.save
           @assignment.category_id = @category.id
-        end   
-      end     
+        end
+      end
       @assignment.save
 
       if params[:questionnaires] and params[:limits] and params[:weights]
@@ -385,7 +385,7 @@ def update
       end
 
       begin
-        newpath = @assignment.get_path        
+        newpath = @assignment.get_path
       rescue
         newpath = nil
       end
@@ -403,22 +403,22 @@ def update
         end
       end
       flash[:notice] = 'Assignment was successfully updated.'
-      redirect_to :action => 'show', :id => @assignment                  
+      redirect_to :action => 'show', :id => @assignment
     else # Simply refresh the page
       @wiki_types = WikiType.find(:all)
       render :action => 'edit'
-    end    
+    end
   end
-  
+
   def show
     @assignment = Assignment.find(params[:id])
   end
-  
+
   def delete
     assignment = Assignment.find(params[:id])
-    
+
     # If the assignment is already deleted, go back to the list of assignments
-    if assignment 
+    if assignment
       begin
         @user =  ApplicationHelper::get_user_role(session[:user])
         @user = session[:user]
@@ -428,26 +428,26 @@ def update
         end
         assignment.delete(params[:force])
         @a = Node.find(:first, :conditions => ['node_object_id = ? and type = ?',params[:id],'AssignmentNode'])
-     
+
         @a.destroy
         flash[:notice] = "The assignment is deleted"
       rescue
         url_yes = url_for :action => 'delete', :id => params[:id], :force => 1
-        url_no  = url_for :action => 'delete', :id => params[:id]        
+        url_no  = url_for :action => 'delete', :id => params[:id]
         error = $!
         flash[:error] = error.to_s + " Delete this assignment anyway?&nbsp;<a href='#{url_yes}'>Yes</a>&nbsp;|&nbsp;<a href='#{url_no}'>No</a><BR/>"
       end
     end
-    
+
     redirect_to :controller => 'tree_display', :action => 'list'
-  end  
-  
+  end
+
   def list
     set_up_display_options("ASSIGNMENT")
     @assignments=super(Assignment)
     #    @assignment_pages, @assignments = paginate :assignments, :per_page => 10
   end
-  
+
   def associate_assignment_to_course
     @assignment = Assignment.find(params[:id])
     @user =  ApplicationHelper::get_user_role(session[:user])
@@ -457,16 +457,17 @@ def update
 #      @courses = Course.find_all_by_instructor_id(session[:user].id, :order => 'name')
 #    else
 #      @courses = TaMapping.get_courses(session[:user].id)
-#    end   
+#    end
   end
-  
-  def remove_assignment_from_course    
+
+  def remove_assignment_from_course
     assignment = Assignment.find(params[:id])
     oldpath = assignment.get_path rescue nil
-    assignment.course_id = nil    
+    assignment.course_id = nil
     assignment.save
     newpath = assignment.get_path rescue nil
     FileHelper.update_file_location(oldpath,newpath)
     redirect_to :controller => 'tree_display', :action => 'list'
-  end  
+  end
 end
+

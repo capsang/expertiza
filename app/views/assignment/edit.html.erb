@@ -6,7 +6,7 @@
   <%= render :partial => 'rubrics' %>
 <br/>
 <hr/>
-<div style="font-size:large;"><b><label id="staggered_label" style="display:none">Deadlines for chapter 1</label></b></div>  
+<div style="font-size:large;"><b><label id="staggered_label" style="display:none">Deadlines for chapter 1</label></b></div>
   <table>
     <tr style="font-size:12px;padding:15px">
         <th style="padding:10px">Deadline type</th>
@@ -21,9 +21,9 @@
   <% 	i = 0;
         duedates = @assignment.due_dates
         duedates.sort! {|a,b| a.due_at <=> b.due_at}
-        
+
 		for @due_date in duedates
-		  
+
 		      if  @due_date.deadline_type_id == 1
 		         heading = "Submission deadline"
 		      end
@@ -42,7 +42,7 @@
 				if  @due_date.deadline_type_id == 6
 		         heading = "Switch Topic Deadline"
 		      end
-		      
+
 		 %>
 	<tr>
 		<td align ="center"><%= heading%></td>
@@ -64,10 +64,12 @@
 <div id="days_between_chapters" style="position:relative">
   <label>Number of {weeks, days} between submission of successive chapters:</label>
   <input type="text" id="weeks" name ="weeks" maxlength="2" size="3" value="<%=@weeks%>"/> week(s) &nbsp;
-  <input type="text" id="days" name ="days" maxLength="2" size="3" value="<%=@days%>"/> day(s)          
+  <input type="text" id="days" name ="days" maxLength="2" size="3" value="<%=@days%>"/> day(s)
 </div>
 <div>
-<%= render :partial => 'team_rotation_condition' %>
+<%=
+  # render :partial => 'team_rotation_condition'
+%>
 </div>
 <br/>
   &nbsp;&nbsp;<%= submit_tag "Save assignment" %>
@@ -78,3 +80,4 @@
 </div>
 
 <script>get_assignment_startdate();</script>
+

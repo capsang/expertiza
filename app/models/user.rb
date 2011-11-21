@@ -5,7 +5,7 @@ require 'openssl'
 class User < ActiveRecord::Base
   has_many :participants, :class_name => 'Participant', :foreign_key => 'user_id'
   has_many :assignments, :through => :participants
-  
+
   belongs_to :parent, :class_name => 'User', :foreign_key => 'parent_id'
   has_many :bookmark_users
   has_many :teams_users
@@ -16,23 +16,23 @@ class User < ActiveRecord::Base
 
   attr_accessor :clear_password
   attr_accessor :confirm_password
-  
+
   def list_mine(object_type, user_id)
     object_type.find(:all, :conditions => ["instructor_id = ?", user_id])
   end
-  
-  def getAvailableUsers(name)    
+
+  def getAvailableUsers(name)
     parents = Role.find(self.role_id).get_parents
-    
+
     allUsers = User.find(:all, :conditions => ['name LIKE ?',"#{name}%"],:limit => 10)
     users = Array.new
-    allUsers.each { | user | 
+    allUsers.each { | user |
       role = Role.find(user.role_id)
-      if parents.index(role) 
+      if parents.index(role)
         users << user
       end
-    }    
-    return users 
+    }
+    return users
   end
 
   def role
@@ -41,7 +41,7 @@ class User < ActiveRecord::Base
     end
     return @role
   end
-    
+
   def before_save
     if self.clear_password  # Only update the password if it has been changed
       self.password_salt = self.object_id.to_s + rand.to_s
@@ -58,13 +58,13 @@ class User < ActiveRecord::Base
     self.password == Digest::SHA1.hexdigest(self.password_salt.to_s +
                                                  clear_password)
   end
-  
+
   # Generate email to user with new password
-  #ajbudlon, sept 07, 2007   
-  def send_password(clear_password) 
+  #ajbudlon, sept 07, 2007
+  def send_password(clear_password)
     self.password = Digest::SHA1.hexdigest(self.password_salt.to_s + clear_password)
     self.save
-    
+
     Mailer.deliver_message(
         {:recipients => self.email,
          :subject => "Your Expertiza password has been reset",
@@ -72,19 +72,19 @@ class User < ActiveRecord::Base
            :user => self,
            :password => clear_password,
            :first_name => ApplicationHelper::get_user_first_name(self),
-           :partial_name => "send_password"           
+           :partial_name => "send_password"
          }
         }
     )
-    
-  end   
- 
+
+  end
+
   def self.import(row,session,id = nil)
       if row.length != 4
-       raise ArgumentError, "Not enough items" 
-      end    
-      user = User.find_by_name(row[0])    
-      
+       raise ArgumentError, "Not enough items"
+      end
+      user = User.find_by_name(row[0])
+
       if user == nil
         attributes = ImportFileHelper::define_attributes(row)
         user = ImportFileHelper::create_new_user(attributes,session)
@@ -95,12 +95,12 @@ class User < ActiveRecord::Base
         user.parent_id = (session[:user]).id
         user.save
       end
-  end  
-  
+  end
+
   def get_author_name
     return self.fullname
   end
-    
+
   def self.yesorno(elt)
     if elt==true
       "yes"
@@ -109,8 +109,8 @@ class User < ActiveRecord::Base
     else
       ""
     end
-  end    
-    
+  end
+
   # locate User based on provided login.
   # If user supplies e-mail or name, the
   # helper will try to find that User account.
@@ -121,37 +121,37 @@ class User < ActiveRecord::Base
          shortName = items[0]
          userList = User.find(:all, {:conditions=> ["name =?",shortName]})
          if userList != nil && userList.length == 1
-            user = userList.first            
+            user = userList.first
          end
       end
-      return user     
-  end 
-  
-  def set_instructor (new_assign)  
-    new_assign.instructor_id = self.id  
+      return user
   end
-  
+
+  def set_instructor (new_assign)
+    new_assign.instructor_id = self.id
+  end
+
   def get_instructor
     self.id
   end
-  
-  def set_courses_to_assignment 
-    @courses = Course.find_all_by_instructor_id(self.id, :order => 'name')    
+
+  def set_courses_to_assignment
+    @courses = Course.find_all_by_instructor_id(self.id, :order => 'name')
   end
-  
+
   # SDN generate new keys and certificate for user
   #  public key and certificate are stored
   #  private_key is emailed to user
   def gen_keys_and_certificate
-    
+
     user_id = self.name
-    
+
     # generate new keys
     new_key = OpenSSL::PKey::RSA.generate( 1024 )
     new_public = new_key.public_key
     new_private = new_key.to_pem
-      
-    # creating the digital certificate      
+
+    # creating the digital certificate
     cert = OpenSSL::X509::Certificate.new
     cert.version = 1
     cert.subject = cert.issuer = OpenSSL::X509::Name.parse("/C="+user_id.to_s)
@@ -159,28 +159,28 @@ class User < ActiveRecord::Base
     cert.not_before = Time.now
     cert.not_after = Time.now+3600*24*365
     cert.sign(new_key, OpenSSL::Digest::SHA1.new)
-     
+
     # save the public key and certificate
     self.public_key = new_key.public_key.to_pem
     self.certificate = cert.to_pem
     self.save
-    
+
     # now send an email with the private key
     # TODO Mailer code doesn't work in dev environmant, so just dump to console
     # TODO disabling both private key console dump and email for final project
     #puts "Keys and certificate created for #{self.name}"
     #puts new_key.to_pem
     #send_pkey(new_key.to_pem)
-                
+
   end
 
   # allow key to be directly passed for debug
   #def self.get_key
   #  @@pass_private_key
   #end
-  
-  def send_pkey(priv_key) 
-    
+
+  def send_pkey(priv_key)
+
     Mailer.deliver_message(
         {:recipients => self.email,
          :subject => "Your Expertiza signature key",
@@ -188,11 +188,11 @@ class User < ActiveRecord::Base
            :user => self,
            :pkey => priv_key,
            :first_name => ApplicationHelper::get_user_first_name(self),
-           :partial_name => "send_pkey"           
+           :partial_name => "send_pkey"
          }
         }
     )
-    
-  end   
 
+  end
 end
+

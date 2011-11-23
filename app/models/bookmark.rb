@@ -1,8 +1,7 @@
 class Bookmark < ActiveRecord::Base
-	#acts_as_rateable
-	has_many :bmappings
-	
-##SEARCH FUNCTIONS
+	has_many(:bmappings)
+
+  # -------------------- Search operations for bookmark -------------------- #
 
   ## gives the 20 most popular or 20 most recent bookmarks in the system, depending on the order_by parameter. Function returns
   ## an array. Each element of the array is a hash, detailing one record
@@ -204,12 +203,13 @@ class Bookmark < ActiveRecord::Base
         end
      return result_array
    end
-## searches for tspecified tags, among a specified user, orders them by most popular and the most recently added
+
+   ## searches for tspecified tags, among a specified user, orders them by most popular and the most recently added
    def self.search_fortags_foruser(tags_array, this_user_id, order_by)
      #order by is in "most_popular" and "most_recent"
      result_array = Array.new
 
-    
+
      ## search for ids of the tags
       @tags = BookmarksHelper.find_tags(tags_array)
       @q_tuples_with_all_tags = Array.new
@@ -273,264 +273,219 @@ class Bookmark < ActiveRecord::Base
      return result_array
    end
 
-    ## ADDING BOOKMARK/EDITING BOOKMARK FUNCTION
+  # -------------------- CRUD operations for bookmark -------------------- #
 
+  def self.add_topic_bookmark(b_url, b_title, b_tags_text, b_description,session_user, topicid)
+    # Check if the bookmark exists and add / edit based on that
+    status_string = Bookmark.check_bookmark_and_mapping(b_url,session_user)
+    if(status_string == "url_not_found"|| status_string == "mapping_not_found")
+      Bookmark.add_bookmark(b_url, b_title, b_tags_text, b_description,session_user,topicid)
+    elsif(status_string == "mapping_exists")
+      Bookmark.edit_this_bookmark(b_url, b_title, b_tags_text, b_description,session_user)
+    end
+  end
 
-  ## check if bookmark url exists. If the url does exists, check if the user has this bookmark in his repository
+  # Check if bookmark url exists.
+  # If the url does exists, check if the user has this bookmark in his repository
   def self.check_bookmark_and_mapping (b_url, session_user)
    bookmark_resource = Bookmark.find(:first, :conditions=>["url = ?",b_url])
    return_string = ""
-    if bookmark_resource == nil
-        return_string = "url_not_found"
+    if bookmark_resource.nil?
+      return_string = "url_not_found"
     else
-        bookmark_user_mapping = Bmapping.find(:first, :conditions =>["user_id = ? and bookmark_id = ?", session_user.id, bookmark_resource.id])
-         if( bookmark_user_mapping == nil)
-            return_string = "mapping_not_found"
-         else
-             return_string = "mapping_exists"
-         end
+      bookmark_user_mapping = Bmapping.find(:first, :conditions =>["user_id = ? and bookmark_id = ?", session_user.id, bookmark_resource.id])
+      if bookmark_user_mapping.nil?
+        return_string = "mapping_not_found"
+      else
+        return_string = "mapping_exists"
+      end
     end
-
     return return_string
   end
-     ## if bookmark mapping for a user and a url exists, then edit
-    def self.edit_this_bookmark (b_url, b_title, b_tags_text, b_description,session_user)     
-     bookmark_resource = Bookmark.find(:first, :conditions=>["url = ?",b_url])
-     bmapping_status = "found"
-     bookmark_user_mapping = Bmapping.find(:first, :conditions =>["user_id = ? and bookmark_id = ?", session_user.id, bookmark_resource.id])
-     bookmark_user_mapping.bookmark_id = bookmark_resource.id
-     bookmark_user_mapping.title = b_title
-     bookmark_user_mapping.description = b_description
-     bookmark_user_mapping.user_id = session_user.id
-     current_timestamp = Time.now
-     bookmark_user_mapping.date_modified = current_timestamp
-     bookmark_user_mapping.save
 
-
-
-               ## deleting existing tags
-     Qualifier.destroy_all(["bmapping_id = ?", bookmark_user_mapping.id])
-        puts "!!@@@@###$$$ looking at tags"
-        tag_array =  BookmarksHelper.separate_tags(b_tags_text)
-        for each_tag in tag_array
-             puts each_tag
-                ## look for each tag that is present in tags, if not make them, then make the qualifier entry
-             tag_tuple = Tag.find(:first, :conditions=>["tagname = ?",each_tag])
-             if(tag_tuple == nil )
-                  puts "NEW TAG #{each_tag}"
-                  tag_tuple = Tag.new
-                  tag_tuple.tagname = each_tag
-                  tag_tuple.save
-             end
-                ## the entries in the qualifier have been deleted.. so all tags are associated freshly now
-
-
-             puts "btu_tuple - qualifier is nil for tag #{each_tag} - tag - tuple id #{tag_tuple.id} n bmapping_id #{bookmark_user_mapping.id} "
-                  btu_tuple = Qualifier.new
-                  btu_tuple.tag_id = tag_tuple.id
-                  btu_tuple.bmapping_id = bookmark_user_mapping.id
-                  btu_tuple.save
-        end
-     end
-
-	 def self.add_topic_bookmark(b_url, b_title, b_tags_text, b_description,session_user, topicid)
-	 
-		puts "inside topic bookmark......."
-		puts  topicid 	
-	    status_string = Bookmark.check_bookmark_and_mapping(b_url,session_user)
-	      if(status_string == "url_not_found"|| status_string == "mapping_not_found")
-	             Bookmark.add_bookmark(b_url, b_title, b_tags_text, b_description,session_user,topicid)
-	
-	      elsif(status_string == "mapping_exists")
-	             Bookmark.edit_this_bookmark(b_url, b_title, b_tags_text, b_description,session_user)
-	            
-	      end
-	
-	  end
-	
+  # Adds a bookmark and its various associations
 	def self.add_bookmark(b_url, b_title, b_tags_text, b_description,session_user,topicid)
-	      bookmark_resource = Bookmark.find(:first, :conditions =>["url = ?",b_url])
-	      flag=0
-	      # bookmark with the same url does not exists.
-	      if (bookmark_resource == nil)
-	      		puts "ssssss"
-	            @bookmarkid=add_new_bookmark(b_url,session_user.id)
-	            @bmappingid=add_bmapping(@bookmarkid, b_title, session_user.id, b_description,b_tags_text )
-	            add_bmapping_signuptopic(topicid, @bmappingid)
-	  	  # bookmark with the same url does not exists.
-	      else 
-	        @bmapping=Bmapping.find_by_bookmark_id_and_user_id(bookmark_resource.id,session_user.id)
-	        
-	        #bookmark with the same user exist.
-	        if(@bmapping!=nil)
-	        	
-	        	 @topic = SignUpTopic.find(topicid)
-	        	 
-	        	 if @topic!=nil && @bmapping !=nil
-	                (@topic.bmappings).each do |mapping|
-	                	if mapping.id == @bmapping.id
-	             			puts "in if topic not null cond."
-	                 		Bookmark.edit_this_bookmark(b_url, b_title, b_tags_text, b_description,session_user)
-	                 		flag=1
-	                 	end
-	                 end
-	              end
-	             #Signup Topic- Bookmark entry does not exists 
-	             if flag == 0
-	                  add_bmapping_signuptopic(topicid, @bmapping.id)
-	             end
-	             
-	        #bookmark with same user does not exist.
-	        else
-	              bookmark_resource.user_count = bookmark_resource.user_count+1
-	              bookmark_resource.save
-	              @bmappingid=add_bmapping(bookmark_resource.id, b_title, session_user.id, b_description,b_tags_text )
-	              add_bmapping_signuptopic(topicid, @bmappingid)
-	        end
-	        
-	      end  
+    bookmark_resource = Bookmark.find(:first, :conditions => ["url = ?",b_url])
+    flag = 0
+    # Bookmark with the same url does not exists.
+    if bookmark_resource.nil?
+      # Add the newly discovered bookmark
+      @bookmarkid = add_new_bookmark(b_url,session_user.id)
+      # Add its associations to a user
+      @bmappingid = add_bmapping(@bookmarkid, b_title, session_user.id, b_description,b_tags_text )
+      # Add its association to the sign up topic
+      add_bmapping_signuptopic(topicid, @bmappingid)
+    # Bookmark with the same url exists.
+    else
+      @bmapping = Bmapping.find_by_bookmark_id_and_user_id(bookmark_resource.id,session_user.id)
+      # Bookmark with the same user exist.
+      unless @bmapping.nil?
+        @topic = SignUpTopic.find(topicid)
+        unless @topic.nil?
+          @topic.bmappings.each do |mapping|
+            if (mapping.id == @bmapping.id)
+              Bookmark.edit_this_bookmark(b_url, b_title, b_tags_text, b_description,session_user)
+              flag = 1
+            end
+          end
+        end
+        # Signup Topic does not exists
+        if flag == 0
+          add_bmapping_signuptopic(topicid, @bmapping.id)
+        end
+      # Bookmark with same user does not exist.
+      else
+        # Increment user count
+        bookmark_resource.user_count = bookmark_resource.user_count + 1
+        bookmark_resource.save
+        # Add its association with the user
+        @bmappingid = add_bmapping(bookmark_resource.id, b_title, session_user.id, b_description,b_tags_text)
+        add_bmapping_signuptopic(topicid, @bmappingid)
+      end
+    end
 	end
-	
+
+  # Adds a new bookmark
 	def self.add_new_bookmark(b_url,user_id)
-	  
-	          ## create a resource
-	         bookmark_resource = Bookmark.new
-	         bookmark_resource.url = b_url
-	         bookmark_resource.discoverer_user_id = user_id
-	         bookmark_resource.user_count = 1
-	         bookmark_resource.save
-
-	         return bookmark_resource.id
+    # Create a resource
+    bookmark_resource = Bookmark.new
+    bookmark_resource.url = b_url
+    bookmark_resource.discoverer_user_id = user_id
+    bookmark_resource.user_count = 1
+    bookmark_resource.save
+    return bookmark_resource.id
 	end
-	
+
+  # Add bookmark - user association with its meta fields
 	def self.add_bmapping(bid, b_title, user_id, b_description,b_tags_text)
-	          
-	          bookmark_user_mapping = Bmapping.new
-	          bookmark_user_mapping.bookmark_id = bid
-	          bookmark_user_mapping.title = b_title
-	          bookmark_user_mapping.description = b_description
-	          bookmark_user_mapping.user_id =user_id
-	          current_timestamp = Time.now
-	          bookmark_user_mapping.date_created = current_timestamp
-	          bookmark_user_mapping.date_modified = current_timestamp
-	          bookmark_user_mapping.save
-	          
-	          ## tags come in as a text, separating them into a array
-	          tag_array = BookmarksHelper.separate_tags(b_tags_text)
-	          for each_tag in tag_array
-	            puts "TAGNAME ="
-	            puts each_tag
-	               ## look for each tag that is present in tags, if not make them, then make the BTU entry
-	               tag_tuple = Tag.find(:first, :conditions =>["tagname = ?",each_tag])
-	               if(tag_tuple == nil )
-	                       puts "WE JUST FOUND OUT THAT TAGNAME DOeS NOT EXISTS in tag repo"
-	                       tag_tuple = Tag.new
-	                       tag_tuple.tagname = each_tag
-	                       tag_tuple.save
-	               end
-	                     ## check if there is an entry for this tag , this user and this bookmar
-	               puts "now checking qualifier - args first, tag_id, bmapping_id"
-	               puts tag_tuple.id
-	               puts bookmark_user_mapping.id
-	               btu_tuple =  Qualifier.find(:first, :conditions =>[ "tag_id = ? and bmapping_id = ?", tag_tuple.id, bookmark_user_mapping.id] )
-	               if btu_tuple == nil
-	                       puts "$$$$$$$$$$ btu_tuple is nil"
-	                       btu_tuple = Qualifier.new
-	                       btu_tuple.tag_id = tag_tuple.id
-	                       btu_tuple.bmapping_id = bookmark_user_mapping.id
-	                       btu_tuple.save
-	               end
-	          end
-	          return bookmark_user_mapping.id
-	              
+    bookmark_user_mapping = Bmapping.new
+    bookmark_user_mapping.bookmark_id = bid
+    bookmark_user_mapping.title = b_title
+    bookmark_user_mapping.description = b_description
+    bookmark_user_mapping.user_id =user_id
+    current_timestamp = Time.now
+    bookmark_user_mapping.date_created = current_timestamp
+    bookmark_user_mapping.date_modified = current_timestamp
+    bookmark_user_mapping.save
+    # Add tags
+    # tags come in as a text, separating them into a array
+    tag_array = BookmarksHelper.separate_tags(b_tags_text)
+    for each_tag in tag_array
+      # Look for each tag that is present in tags, if not make them, then make the BTU entry
+      tag_tuple = Tag.find(:first, :conditions =>["tagname = ?",each_tag])
+      if tag_tuple.nil?
+        tag_tuple = Tag.new
+        tag_tuple.tagname = each_tag
+        tag_tuple.save
+      end
+      # Check if there is an entry for this tag, this user and this bookmark (via bmappings table)
+      btu_tuple =  Qualifier.find(:first, :conditions =>[ "tag_id = ? and bmapping_id = ?", tag_tuple.id, bookmark_user_mapping.id] )
+      if btu_tuple.nil?
+        btu_tuple = Qualifier.new
+        btu_tuple.tag_id = tag_tuple.id
+        btu_tuple.bmapping_id = bookmark_user_mapping.id
+        btu_tuple.save
+      end
+    end
+    return bookmark_user_mapping.id
 	end
-	          
+
+  # Associate bmapping to the sign up topic
 	def self.add_bmapping_signuptopic(topicid, bmappingid)
-	          @topic = SignUpTopic.find(topicid)
-	          @bmapping = Bmapping.find(bmappingid)
-	          if(@topic!=nil && @bmapping !=nil)
-	          	@topic.bmappings << @bmapping
-	         	@topic.save
-	         	
-	          end
-	          
-	          #@bmapping_topic=BmappingsSignUpTopic.new
-	          #@bmapping_topic.topicid=topicid
-	          #@bmapping_topic.bookmarkid=bmappingid
-	          #@bmapping_topic.save
+    @topic = SignUpTopic.find(topicid)
+    @bmapping = Bmapping.find(bmappingid)
+    unless (@topic.nil? && @bmapping.nil?)
+      @topic.bmappings << @bmapping
+      @topic.save
+    end
 	end
 
 
-## add bookmark and bmapping. Check if url exists bmapping exists, if it does - edits, if it doesnt - adds
+  # Add bookmark and bmapping.
+  # Check if url exists, bmapping exists, if it does - edit, if it doesnt - add
   def self.add_this_bookmark(b_url, b_title, b_tags_text, b_description,session_user)
     status_string = Bookmark.check_bookmark_and_mapping(b_url,session_user)
-      if(status_string == "url_not_found"|| status_string == "mapping_not_found")
-             Bookmark.adding_bookmark(b_url, b_title, b_tags_text, b_description,session_user)
-
-      elsif(status_string == "mapping_exists")
-             Bookmark.edit_this_bookmark(b_url, b_title, b_tags_text, b_description,session_user)
-            
-      end
-
+    if (status_string == "url_not_found"|| status_string == "mapping_not_found")
+      Bookmark.adding_bookmark(b_url, b_title, b_tags_text, b_description,session_user)
+    elsif (status_string == "mapping_exists")
+      Bookmark.edit_this_bookmark(b_url, b_title, b_tags_text, b_description,session_user)
+    end
   end
 
 
-  ##adds url if it doesn't exist, adds the appropriate bmapping
-   def self.adding_bookmark(b_url, b_title, b_tags_text, b_description,session_user)
-      bookmark_resource = Bookmark.find(:first, :conditions =>["url = ?",b_url])
-      if (bookmark_resource == nil)
-               ## create a resource
-         bookmark_resource = Bookmark.new
-         bookmark_resource.url = b_url
-         bookmark_resource.discoverer_user_id = session_user.id
-         bookmark_resource.user_count = 0
-         bookmark_resource.save
-
-      end
-
-
-           ##check whether the bookmark_user mapping is present
-      bookmark_user_mapping = Bmapping.new
-      bookmark_user_mapping.bookmark_id   = bookmark_resource.id
-      bookmark_user_mapping.title = b_title
-      bookmark_user_mapping.description = b_description
-      bookmark_user_mapping.user_id = session_user.id
-      current_timestamp = Time.now
-      bookmark_user_mapping.date_created = current_timestamp
-      bookmark_user_mapping.date_modified = current_timestamp
-      bookmark_user_mapping.save
-      bookmark_resource.user_count = bookmark_resource.user_count+1
+  # Adds url if it doesn't exist, adds the appropriate bmapping
+  def self.adding_bookmark(b_url, b_title, b_tags_text, b_description,session_user)
+    bookmark_resource = Bookmark.find(:first, :conditions =>["url = ?",b_url])
+    if (bookmark_resource.nil?)
+      # Create a resource
+      bookmark_resource = Bookmark.new
+      bookmark_resource.url = b_url
+      bookmark_resource.discoverer_user_id = session_user.id
+      bookmark_resource.user_count = 0
       bookmark_resource.save
-         
-             ## tags come in as a text, separating them into a array
-      tag_array = BookmarksHelper.separate_tags(b_tags_text)
-      for each_tag in tag_array
-         puts "TAGNAME ="
-         puts each_tag
-               ## look for each tag that is present in tags, if not make them, then make the BTU entry
-         tag_tuple = Tag.find(:first, :conditions =>["tagname = ?",each_tag])
-         if(tag_tuple == nil )
-                 puts "WE JUST FOUND OUT THAT TAGNAME DOeS NOT EXISTS in tag repo"
-                 tag_tuple = Tag.new
-                 tag_tuple.tagname = each_tag
-                 tag_tuple.save
-         end
-               ## check if there is an entry for this tag , this user and this bookmar
-         puts "now checking qualifier - args first, tag_id, bmapping_id"
-         puts tag_tuple.id
-         puts bookmark_user_mapping.id
-         btu_tuple =  Qualifier.find(:first, :conditions =>[ "tag_id = ? and bmapping_id = ?", tag_tuple.id, bookmark_user_mapping.id] )
-         if btu_tuple == nil
-                 puts "$$$$$$$$$$ btu_tuple is nil"
-                 btu_tuple = Qualifier.new
-                 btu_tuple.tag_id = tag_tuple.id
-                 btu_tuple.bmapping_id = bookmark_user_mapping.id
-                 btu_tuple.save
-         end
-
-     end
-
-
- end
-  
+    end
+    # Check whether the bookmark_user mapping is present
+    bookmark_user_mapping = Bmapping.new
+    bookmark_user_mapping.bookmark_id   = bookmark_resource.id
+    bookmark_user_mapping.title = b_title
+    bookmark_user_mapping.description = b_description
+    bookmark_user_mapping.user_id = session_user.id
+    current_timestamp = Time.now
+    bookmark_user_mapping.date_created = current_timestamp
+    bookmark_user_mapping.date_modified = current_timestamp
+    bookmark_user_mapping.save
+    bookmark_resource.user_count = bookmark_resource.user_count+1
+    bookmark_resource.save
+    # Tags come in as a text, separating them into a array
+    tag_array = BookmarksHelper.separate_tags(b_tags_text)
+    for each_tag in tag_array
+      # Look for each tag that is present in tags, if not make them, then make the BTU entry
+      tag_tuple = Tag.find(:first, :conditions =>["tagname = ?",each_tag])
+      if tag_tuple.nil?
+        tag_tuple = Tag.new
+        tag_tuple.tagname = each_tag
+        tag_tuple.save
+      end
+      # Check if there is an entry for this tag , this user and this bookmark
+      btu_tuple =  Qualifier.find(:first, :conditions =>[ "tag_id = ? and bmapping_id = ?", tag_tuple.id, bookmark_user_mapping.id] )
+      if btu_tuple.nil?
+        btu_tuple = Qualifier.new
+        btu_tuple.tag_id = tag_tuple.id
+        btu_tuple.bmapping_id = bookmark_user_mapping.id
+        btu_tuple.save
+      end
+    end
   end
+
+  # If bookmark mapping for a user and a url exists, then edit
+  def self.edit_this_bookmark (b_url, b_title, b_tags_text, b_description,session_user)
+    bookmark_resource = Bookmark.find(:first, :conditions=>["url = ?",b_url])
+    bmapping_status = "found"
+    bookmark_user_mapping = Bmapping.find(:first, :conditions =>["user_id = ? and bookmark_id = ?", session_user.id, bookmark_resource.id])
+    bookmark_user_mapping.bookmark_id = bookmark_resource.id
+    bookmark_user_mapping.title = b_title
+    bookmark_user_mapping.description = b_description
+    bookmark_user_mapping.user_id = session_user.id
+    current_timestamp = Time.now
+    bookmark_user_mapping.date_modified = current_timestamp
+    bookmark_user_mapping.save
+    # Deleting existing tags
+    Qualifier.destroy_all(["bmapping_id = ?", bookmark_user_mapping.id])
+    tag_array =  BookmarksHelper.separate_tags(b_tags_text)
+    for each_tag in tag_array
+      # Look for each tag that is present in tags, if not make them, then make the qualifier entry
+      tag_tuple = Tag.find(:first, :conditions=>["tagname = ?",each_tag])
+      if tag_tuple.nil?
+        tag_tuple = Tag.new
+        tag_tuple.tagname = each_tag
+        tag_tuple.save
+      end
+      # The entries in the qualifier have been deleted.. so all tags are associated freshly now
+      btu_tuple = Qualifier.new
+      btu_tuple.tag_id = tag_tuple.id
+      btu_tuple.bmapping_id = bookmark_user_mapping.id
+      btu_tuple.save
+    end
+  end
+end
+

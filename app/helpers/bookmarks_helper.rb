@@ -1,24 +1,23 @@
 module BookmarksHelper
 
-  def self.find_tags(tags_array )
-     @tags = Array.new
+  def self.find_tags(tags_array)
+    @tags = Array.new
     for each_of_my_tag in tags_array
       this_tag_tuple= Tag.find(:first, :conditions=>["tagname = ?",each_of_my_tag])
-      if this_tag_tuple != nil
-        puts " We found one matching"
+      unless this_tag_tuple.nil?
         @tags << this_tag_tuple
       else
         puts " We dint find any matching for #{each_of_my_tag}"
       end
     end
-         return @tags
+    return @tags
   end
 
   def self.join_tags(my_tag_array)
- my_return_string = ""
-  for each_tag in my_tag_array
-    my_return_string = my_return_string +each_tag + ", "
-  end
+    my_return_string = ""
+    for each_tag in my_tag_array
+      my_return_string = my_return_string + each_tag + ", "
+    end
     return my_return_string
   end
 
@@ -37,11 +36,12 @@ module BookmarksHelper
   end
 
   def self.prepare_string(mystring)
-    # for a given string remove all spaces to the left, right, and downcase all of it - sepcifically done to urls, and search tags
-
-     b_tag1 = mystring.lstrip
-     b_tag2 = b_tag1.rstrip
-     b_tag3 = b_tag2.downcase
+    # For a given string remove all spaces to the left, right, and downcase all of it ...
+    # ... sepcifically done to urls, and search tags
+    b_tag1 = mystring.lstrip
+    b_tag2 = b_tag1.rstrip
+    b_tag3 = b_tag2.downcase
     return b_tag3
-   end
+  end
 end
+
